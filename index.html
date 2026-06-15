@@ -470,15 +470,17 @@
 </header>
 <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
 
-<!-- CONFIGURATIE (verberg dit na instellen) -->
-<div class="config-section" id="configSection">
-  <h3>⚙️ Eenmalige instelling</h3>
-  <p>Vul hieronder je EmailJS-gegevens in. Na opslaan worden deze onthouden op dit apparaat. <a href="https://www.emailjs.com" target="_blank" style="color:#856404">EmailJS is gratis</a> en vereist geen server.</p>
+<!-- CONFIGURATIE alleen zichtbaar via ?admin=lkq2025 -->
+<div class="config-section" id="configSection" style="display:none">
+  <h3>Beheerder instelling</h3>
+  <p>Vul hieronder de EmailJS-gegevens in. Deze worden opgeslagen in de browser en zijn niet zichtbaar voor chauffeurs.</p>
   <input type="text" id="cfg_service" placeholder="EmailJS Service ID (bijv. service_abc123)">
   <input type="text" id="cfg_template" placeholder="EmailJS Template ID (bijv. template_xyz789)">
   <input type="text" id="cfg_pubkey" placeholder="EmailJS Public Key">
   <input type="email" id="cfg_email" placeholder="Ontvangers e-mailadres">
-  <button onclick="saveConfig()" style="width:100%;padding:10px;background:var(--lkq-blue);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;">Opslaan & verbergen</button>
+  <button onclick="saveConfig()" style="width:100%;padding:10px;background:var(--lkq-blue);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;">Opslaan</button>
+  <button onclick="clearConfig()" style="width:100%;padding:8px;background:#c62828;color:white;border:none;border-radius:8px;font-size:12px;cursor:pointer;margin-top:6px;">Configuratie wissen</button>
+  <div id="cfg_status" style="font-size:12px;margin-top:8px;color:#856404;"></div>
 </div>
 
 <!-- KOPGEGEVENS -->
@@ -889,10 +891,23 @@ const carImages = {
 // =====================
 function loadConfig() {
   const cfg = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
-  if (cfg.service) {
-    document.getElementById('configSection').style.display = 'none';
+  const params = new URLSearchParams(window.location.search);
+  const isAdmin = params.get('admin') === 'lkq2025';
+  const section = document.getElementById('configSection');
+  if (isAdmin) {
+    section.style.display = 'block';
+    const status = document.getElementById('cfg_status');
+    if (cfg.service) {
+      status.textContent = 'Huidige instelling: e-mail naar ' + (cfg.email || '?') + ' via service ' + cfg.service;
+      document.getElementById('cfg_service').value = cfg.service;
+      document.getElementById('cfg_template').value = cfg.template || '';
+      document.getElementById('cfg_pubkey').value = cfg.pubkey || '';
+      document.getElementById('cfg_email').value = cfg.email || '';
+    } else {
+      status.textContent = 'Nog niet geconfigureerd.';
+    }
   } else {
-    document.getElementById('cfg_email') && (document.getElementById('cfg_email').value = cfg.email || '');
+    section.style.display = 'none';
   }
   return cfg;
 }
@@ -905,11 +920,21 @@ function saveConfig() {
     email: document.getElementById('cfg_email').value.trim()
   };
   if (!cfg.service || !cfg.template || !cfg.pubkey || !cfg.email) {
-    showToast('Vul alle configuratievelden in', 'error'); return;
+    showToast('Vul alle velden in', 'error'); return;
   }
   localStorage.setItem('lkq_cfg', JSON.stringify(cfg));
-  document.getElementById('configSection').style.display = 'none';
+  document.getElementById('cfg_status').textContent = 'Opgeslagen: e-mail naar ' + cfg.email;
   showToast('Configuratie opgeslagen!', 'success');
+}
+
+function clearConfig() {
+  localStorage.removeItem('lkq_cfg');
+  document.getElementById('cfg_service').value = '';
+  document.getElementById('cfg_template').value = '';
+  document.getElementById('cfg_pubkey').value = '';
+  document.getElementById('cfg_email').value = '';
+  document.getElementById('cfg_status').textContent = 'Configuratie gewist.';
+  showToast('Configuratie verwijderd', 'error');
 }
 
 // =====================

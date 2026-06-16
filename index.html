@@ -423,6 +423,73 @@
   }
   .color-dot.selected { border-color: #333; }
 
+
+  .sig-section {
+    margin: 16px 12px 0;
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .sig-section .section-header {
+    background: var(--lkq-blue);
+  }
+  .sig-canvas-wrap {
+    position: relative;
+    background: white;
+    touch-action: none;
+  }
+  #sigCanvas {
+    display: block;
+    width: 100%;
+    height: 160px;
+    cursor: crosshair;
+    background: #fafbfc;
+  }
+  .sig-hint {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 6px 0 2px;
+    pointer-events: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
+  }
+  .sig-hint.hidden { display: none; }
+  .sig-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    background: #f9f9f9;
+  }
+  .sig-actions button {
+    flex: 1;
+    padding: 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .sig-actions button.clear-btn {
+    color: var(--nok);
+    border-color: var(--nok);
+  }
+  .sig-required-msg {
+    font-size: 11px;
+    color: var(--nok);
+    padding: 4px 14px 8px;
+    display: none;
+  }
+  .sig-required-msg.show { display: block; }
+  #sigCanvas.invalid-sig { outline: 2px solid var(--nok); }
+
   input.invalid-field { border-color: var(--nok) !important; }
   .field-error { font-size: 11px; color: var(--nok); margin-top: 3px; display: none; }
   .field-error.show { display: block; }
@@ -841,6 +908,23 @@
   <textarea id="opmerkingen" placeholder="Extra toelichting of opmerkingen..." rows="4"></textarea>
 </div>
 
+
+<!-- HANDTEKENING CHAUFFEUR -->
+<div class="sig-section" id="sigSection">
+  <div class="section-header">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+    Handtekening chauffeur<span class="required-star">*</span>
+  </div>
+  <div class="sig-canvas-wrap">
+    <canvas id="sigCanvas"></canvas>
+    <div class="sig-hint" id="sigHint">✍️ Teken hier uw handtekening</div>
+  </div>
+  <div class="sig-actions">
+    <button class="clear-btn" onclick="clearSignature()">↩ Wissen</button>
+  </div>
+  <div class="sig-required-msg" id="sigRequiredMsg">Handtekening is verplicht</div>
+</div>
+
 <!-- VERZENDEN -->
 <div class="submit-wrap">
   <button class="btn-submit" onclick="submitForm()">
@@ -1004,6 +1088,81 @@ function draw(e, side) {
 
 function stopDraw() { isDrawing = false; }
 
+// =====================
+// SIGNATURE PAD
+// =====================
+let sigDrawing = false;
+let sigHasMark = false;
+let sigLastX = 0, sigLastY = 0;
+
+function initSignaturePad() {
+  const canvas = document.getElementById('sigCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.strokeStyle = '#1a2332';
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Touch
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); sigStart(e.touches[0], canvas); }, {passive:false});
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); sigDraw(e.touches[0], canvas); },  {passive:false});
+  canvas.addEventListener('touchend',   e => { sigDrawing = false; });
+  // Mouse
+  canvas.addEventListener('mousedown', e => sigStart(e, canvas));
+  canvas.addEventListener('mousemove', e => sigDraw(e, canvas));
+  canvas.addEventListener('mouseup',   () => { sigDrawing = false; });
+  canvas.addEventListener('mouseleave',() => { sigDrawing = false; });
+}
+
+function getSigPos(e, canvas) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function sigStart(e, canvas) {
+  sigDrawing = true;
+  const pos = getSigPos(e, canvas);
+  sigLastX = pos.x; sigLastY = pos.y;
+  if (!sigHasMark) {
+    sigHasMark = true;
+    document.getElementById('sigHint').classList.add('hidden');
+    canvas.classList.remove('invalid-sig');
+    document.getElementById('sigRequiredMsg').classList.remove('show');
+  }
+}
+
+function sigDraw(e, canvas) {
+  if (!sigDrawing) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const pos = getSigPos(e, canvas);
+  ctx.beginPath();
+  ctx.moveTo(sigLastX, sigLastY);
+  ctx.lineTo(pos.x, pos.y);
+  ctx.stroke();
+  sigLastX = pos.x; sigLastY = pos.y;
+}
+
+function clearSignature() {
+  const canvas = document.getElementById('sigCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+  sigHasMark = false;
+  document.getElementById('sigHint').classList.remove('hidden');
+}
+
+function getSignatureDataURL() {
+  return sigHasMark ? document.getElementById('sigCanvas').toDataURL('image/png') : null;
+}
+
+
+
 function setColor(c, el) {
   drawColor = c;
   document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
@@ -1096,6 +1255,12 @@ function validate() {
   allCheckKeys.forEach(k => {
     if (!checks[k]) ok = false;
   });
+  // Signature validation
+  if (!sigHasMark) {
+    document.getElementById('sigCanvas').classList.add('invalid-sig');
+    document.getElementById('sigRequiredMsg').classList.add('show');
+    ok = false;
+  }
   const bandFields = ['band_lv','band_rv','band_la','band_ra'];
   bandFields.forEach(id => {
     const el = document.getElementById(id);
@@ -1397,13 +1562,21 @@ async function generatePDF() {
   const sigW = CW / 2 - 2;
   const sigH = 18;
 
-  // Left sig
+  // Left sig — with actual drawn signature
   doc.setFillColor(255,255,255); doc.setDrawColor(...LGRAY); doc.setLineWidth(0.3);
   doc.rect(ML, y, sigW, sigH, 'FD');
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GRAY);
   doc.text('Handtekening en naam chauffeur', ML + 2, y + 4);
+  // Embed actual signature drawing
+  const sigData = getSignatureDataURL();
+  if (sigData) {
+    try { doc.addImage(sigData, 'PNG', ML + 2, y + 5, sigW - 4, sigH - 7); } catch(e) {}
+  }
+  // Chauffeur name under signature
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...BLACK);
+  doc.text(document.getElementById('naam_chauffeur').value, ML + 2, y + sigH - 2);
 
-  // Right sig
+  // Right sig — blank for manager
   const sigX2 = ML + sigW + 4;
   doc.setFillColor(255,255,255);
   doc.rect(sigX2, y, sigW, sigH, 'FD');
@@ -1555,6 +1728,7 @@ window.addEventListener('load', () => {
 
   loadConfig();
   initCanvases();
+  initSignaturePad();
 
   // Progress update on input
   ['weeknummer','datum','kenteken','naam_chauffeur'].forEach(id => {

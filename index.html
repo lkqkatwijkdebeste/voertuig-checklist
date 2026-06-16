@@ -6,7 +6,6 @@
 <title>LKQ Voertuig Checklist</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
 <style>
   :root {
     --lkq-blue: #003087;
@@ -540,11 +539,9 @@
 <!-- CONFIGURATIE alleen zichtbaar via ?admin=lkq2025 -->
 <div class="config-section" id="configSection" style="display:none">
   <h3>Beheerder instelling</h3>
-  <p>Vul hieronder de EmailJS-gegevens in. Deze worden opgeslagen in de browser en zijn niet zichtbaar voor chauffeurs.</p>
-  <input type="text" id="cfg_service" placeholder="EmailJS Service ID (bijv. service_abc123)">
-  <input type="text" id="cfg_template" placeholder="EmailJS Template ID (bijv. template_xyz789)">
-  <input type="text" id="cfg_pubkey" placeholder="EmailJS Public Key">
-  <input type="email" id="cfg_email" placeholder="Ontvangers e-mailadres">
+  <p>Vul hieronder de Netlify Function URL en het ontvangende e-mailadres in. Eenmalig instellen — chauffeurs zien dit niet.</p>
+  <input type="url" id="cfg_url" placeholder="Netlify Function URL (bijv. https://lkq-checklist.netlify.app/.netlify/functions/send-checklist)">
+  <input type="email" id="cfg_email" placeholder="Bevestigings e-mailadres (optioneel, voor jouw overzicht)">
   <button onclick="saveConfig()" style="width:100%;padding:10px;background:var(--lkq-blue);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;">Opslaan</button>
   <button onclick="clearConfig()" style="width:100%;padding:8px;background:#c62828;color:white;border:none;border-radius:8px;font-size:12px;cursor:pointer;margin-top:6px;">Configuratie wissen</button>
   <div id="cfg_status" style="font-size:12px;margin-top:8px;color:#856404;"></div>
@@ -981,14 +978,12 @@ function loadConfig() {
   if (isAdmin) {
     section.style.display = 'block';
     const status = document.getElementById('cfg_status');
-    if (cfg.service) {
-      status.textContent = 'Huidige instelling: e-mail naar ' + (cfg.email || '?') + ' via service ' + cfg.service;
-      document.getElementById('cfg_service').value = cfg.service;
-      document.getElementById('cfg_template').value = cfg.template || '';
-      document.getElementById('cfg_pubkey').value = cfg.pubkey || '';
+    if (cfg.url) {
+      status.textContent = 'Ingesteld: ' + cfg.url;
+      document.getElementById('cfg_url').value = cfg.url;
       document.getElementById('cfg_email').value = cfg.email || '';
     } else {
-      status.textContent = 'Nog niet geconfigureerd.';
+      status.textContent = 'Nog niet geconfigureerd — vul de Netlify URL in.';
     }
   } else {
     section.style.display = 'none';
@@ -997,25 +992,18 @@ function loadConfig() {
 }
 
 function saveConfig() {
-  const cfg = {
-    service: document.getElementById('cfg_service').value.trim(),
-    template: document.getElementById('cfg_template').value.trim(),
-    pubkey: document.getElementById('cfg_pubkey').value.trim(),
-    email: document.getElementById('cfg_email').value.trim()
-  };
-  if (!cfg.service || !cfg.template || !cfg.pubkey || !cfg.email) {
-    showToast('Vul alle velden in', 'error'); return;
-  }
+  const url = document.getElementById('cfg_url').value.trim();
+  const email = document.getElementById('cfg_email').value.trim();
+  if (!url) { showToast('Vul de Netlify Function URL in', 'error'); return; }
+  const cfg = { url, email };
   localStorage.setItem('lkq_cfg', JSON.stringify(cfg));
-  document.getElementById('cfg_status').textContent = 'Opgeslagen: e-mail naar ' + cfg.email;
+  document.getElementById('cfg_status').textContent = 'Opgeslagen: ' + url;
   showToast('Configuratie opgeslagen!', 'success');
 }
 
 function clearConfig() {
   localStorage.removeItem('lkq_cfg');
-  document.getElementById('cfg_service').value = '';
-  document.getElementById('cfg_template').value = '';
-  document.getElementById('cfg_pubkey').value = '';
+  document.getElementById('cfg_url').value = '';
   document.getElementById('cfg_email').value = '';
   document.getElementById('cfg_status').textContent = 'Configuratie gewist.';
   showToast('Configuratie verwijderd', 'error');
@@ -1641,65 +1629,73 @@ async function generatePDF() {
 async function submitForm() {
   if (!validate()) {
     showToast('Vul alle verplichte velden en controlepunten in', 'error');
-    // scroll to first missing
-    const el = document.querySelector('.invalid-field');
+    const el = document.querySelector('.invalid-field, .invalid-sig');
     if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
     return;
   }
 
   const cfg = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
-  if (!cfg.service) {
-    showToast('Configureer eerst EmailJS bovenaan de pagina', 'error');
-    document.getElementById('configSection').scrollIntoView({behavior:'smooth'});
+  if (!cfg.url) {
+    showToast('Nog niet geconfigureerd — vraag de beheerder', 'error');
     return;
   }
 
   document.getElementById('modal').classList.add('show');
+  document.getElementById('modalTitle').textContent = 'PDF genereren...';
+  document.getElementById('modalMsg').textContent = 'Even geduld, de checklist wordt opgemaakt.';
 
   try {
     const doc = await generatePDF();
     const kenteken = document.getElementById('kenteken').value.toUpperCase().replace(/\s/g,'');
-    const naam = document.getElementById('naam_chauffeur').value.trim().replace(/\s+/g,'_');
+    const naam = document.getElementById('naam_chauffeur').value.trim();
     const datum = document.getElementById('datum').value;
-    const filename = `LKQ_Checklist_${kenteken}_${naam}_${datum}.pdf`;
-    const pdfBase64 = doc.output('datauristring');
+    const filename = `LKQ_Checklist_${kenteken}_${naam.replace(/\s+/g,'_')}_${datum}.pdf`;
 
-    // Init EmailJS
-    emailjs.init(cfg.pubkey);
+    // Get pure base64 (strip data URI prefix)
+    const pdfDataUri = doc.output('datauristring');
+    const pdfBase64 = pdfDataUri.split(',')[1];
 
-    document.getElementById('modalTitle').textContent = 'PDF verzenden...';
-    document.getElementById('modalMsg').textContent = 'Even geduld...';
+    document.getElementById('modalTitle').textContent = 'Verzenden...';
+    document.getElementById('modalMsg').textContent = 'Checklist wordt per e-mail verstuurd.';
 
-    await emailjs.send(cfg.service, cfg.template, {
-      to_email: cfg.email,
-      kenteken: kenteken,
-      naam_chauffeur: document.getElementById('naam_chauffeur').value,
-      datum: datum,
-      weeknummer: document.getElementById('weeknummer').value,
-      pdf_data: pdfBase64,
-      pdf_name: filename,
-      opmerkingen: document.getElementById('opmerkingen').value || 'Geen',
+    const response = await fetch(cfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kenteken,
+        naam_chauffeur: naam,
+        datum,
+        weeknummer: document.getElementById('weeknummer').value,
+        opmerkingen: document.getElementById('opmerkingen').value || '',
+        pdf_base64: pdfBase64,
+        pdf_filename: filename,
+      }),
     });
 
+    const result = await response.json();
     document.getElementById('modal').classList.remove('show');
-    showToast('✓ Checklist succesvol verzonden!', 'success');
 
-    // Also offer download
-    doc.save(filename);
+    if (response.ok && result.success) {
+      showToast('✓ Checklist succesvol verzonden!', 'success');
+      // Also download locally as backup
+      doc.save(filename);
+    } else {
+      throw new Error(result.error || 'Onbekende fout');
+    }
 
   } catch (err) {
     document.getElementById('modal').classList.remove('show');
-    console.error(err);
-    // Fallback: just download
+    console.error('Submit error:', err);
+    // Fallback: download PDF locally so nothing is lost
     try {
       const doc2 = await generatePDF();
       const kenteken = document.getElementById('kenteken').value.toUpperCase().replace(/\s/g,'');
       const naam = document.getElementById('naam_chauffeur').value.trim().replace(/\s+/g,'_');
       const datum = document.getElementById('datum').value;
       doc2.save(`LKQ_Checklist_${kenteken}_${naam}_${datum}.pdf`);
-      showToast('PDF opgeslagen. E-mail mislukt – controleer configuratie.', 'error');
+      showToast('E-mail mislukt — PDF opgeslagen op dit apparaat', 'error');
     } catch(e2) {
-      showToast('Fout: ' + (err.text || err.message || 'Onbekende fout'), 'error');
+      showToast('Fout: ' + err.message, 'error');
     }
   }
 }

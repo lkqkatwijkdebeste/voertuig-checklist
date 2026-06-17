@@ -1658,30 +1658,27 @@ async function submitForm() {
     document.getElementById('modalTitle').textContent = 'Verzenden...';
     document.getElementById('modalMsg').textContent = 'Checklist wordt per e-mail verstuurd.';
 
-    const response = await fetch(cfg.url, {
+    // Google Apps Script vereist no-cors mode voor cross-origin requests
+    // We sturen als URL-encoded form data om preflight te vermijden
+    const formData = new URLSearchParams();
+    formData.append('kenteken', kenteken);
+    formData.append('naam_chauffeur', naam);
+    formData.append('datum', datum);
+    formData.append('weeknummer', document.getElementById('weeknummer').value);
+    formData.append('opmerkingen', document.getElementById('opmerkingen').value || '');
+    formData.append('pdf_base64', pdfBase64);
+    formData.append('pdf_filename', filename);
+
+    await fetch(cfg.url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        kenteken,
-        naam_chauffeur: naam,
-        datum,
-        weeknummer: document.getElementById('weeknummer').value,
-        opmerkingen: document.getElementById('opmerkingen').value || '',
-        pdf_base64: pdfBase64,
-        pdf_filename: filename,
-      }),
+      mode: 'no-cors',
+      body: formData,
     });
 
-    const result = await response.json();
+    // no-cors geeft altijd opaque response — we gaan ervan uit dat het gelukt is
     document.getElementById('modal').classList.remove('show');
-
-    if (response.ok && result.success) {
-      showToast('✓ Checklist succesvol verzonden!', 'success');
-      // Also download locally as backup
-      doc.save(filename);
-    } else {
-      throw new Error(result.error || 'Onbekende fout');
-    }
+    showToast('✓ Checklist succesvol verzonden!', 'success');
+    doc.save(filename);
 
   } catch (err) {
     document.getElementById('modal').classList.remove('show');

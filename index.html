@@ -1002,9 +1002,8 @@ function loadConfig() {
 }
 
 function saveConfig() {
-  const url = document.getElementById('cfg_url').value.trim();
+  const url = document.getElementById('cfg_url').value.trim() || DEFAULT_URL;
   const email = document.getElementById('cfg_email').value.trim();
-  if (!url) { showToast('Vul de Netlify Function URL in', 'error'); return; }
   const cfg = { url, email };
   localStorage.setItem('lkq_cfg', JSON.stringify(cfg));
   document.getElementById('cfg_status').textContent = 'Opgeslagen: ' + url;
@@ -1678,61 +1677,45 @@ async function generatePDF() {
 
 
 // =====================
-// SUBMIT — Stuur PDF in chunks via GET, dan mail
+// SUBMIT — Stuur PDF in chunks via fetch, werkt op alle apparaten
 // =====================
 async function submitViaForm(url, data) {
   const { kenteken, naam_chauffeur, datum, weeknummer, opmerkingen, pdf_base64 } = data;
 
-  // Unieke sessie ID
   const sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2,5);
-
-  // Stuur PDF in chunks van 8000 tekens via GET
   const CHUNK = 6000;
   const pdf = pdf_base64 || '';
   const total = Math.ceil(pdf.length / CHUNK) || 0;
 
   document.getElementById('modalTitle').textContent = 'PDF versturen...';
 
-  if (total > 0) {
-    for (let i = 0; i < total; i++) {
-      document.getElementById('modalMsg').textContent = 'Chunk ' + (i+1) + ' van ' + total + '...';
-      const chunk = pdf.slice(i * CHUNK, (i+1) * CHUNK);
-      const params = new URLSearchParams({
-        action: 'chunk',
-        sessionId,
-        idx: i,
-        total,
-        data: chunk,
-      });
-      // Gebruik encodeURIComponent om base64 correct te versturen
-      const img = new Image();
-      img.src = url + '?action=chunk&sessionId=' + encodeURIComponent(sessionId)
-        + '&idx=' + i + '&total=' + total
-        + '&data=' + encodeURIComponent(chunk);
-      // Wacht 200ms tussen chunks
-      await new Promise(r => setTimeout(r, 200));
-    }
+  for (let i = 0; i < total; i++) {
+    document.getElementById('modalMsg').textContent = 'Versturen ' + (i+1) + ' van ' + total + '...';
+    const chunk = pdf.slice(i * CHUNK, (i+1) * CHUNK);
+    const chunkUrl = url
+      + '?action=chunk'
+      + '&sessionId=' + encodeURIComponent(sessionId)
+      + '&idx=' + i
+      + '&total=' + total
+      + '&data=' + encodeURIComponent(chunk);
+    try { await fetch(chunkUrl, { method: 'GET', mode: 'no-cors' }); } catch(e) {}
+    await new Promise(r => setTimeout(r, 150));
   }
 
-  // Wacht even voor cache
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise(r => setTimeout(r, 800));
 
-  // Stuur verzendopdracht met metadata
   document.getElementById('modalMsg').textContent = 'E-mail versturen...';
-  const sendParams = new URLSearchParams({
-    action: 'send',
-    sessionId,
-    kenteken: kenteken || '',
-    naam: naam_chauffeur || '',
-    datum: datum || '',
-    weeknummer: weeknummer || '',
-    opmerkingen: opmerkingen || '',
-  });
-  const sendImg = new Image();
-  sendImg.src = url + '?' + sendParams.toString();
-  await new Promise(r => setTimeout(r, 2000));
+  const sendUrl = url
+    + '?action=send'
+    + '&sessionId=' + encodeURIComponent(sessionId)
+    + '&kenteken=' + encodeURIComponent(kenteken || '')
+    + '&naam=' + encodeURIComponent(naam_chauffeur || '')
+    + '&datum=' + encodeURIComponent(datum || '')
+    + '&weeknummer=' + encodeURIComponent(weeknummer || '')
+    + '&opmerkingen=' + encodeURIComponent(opmerkingen || '');
+  try { await fetch(sendUrl, { method: 'GET', mode: 'no-cors' }); } catch(e) {}
+  await new Promise(r => setTimeout(r, 1500));
 }
-
 
 // =====================
 // MAIL PDF — compact, zonder busaanzichten
@@ -1981,6 +1964,7 @@ async function submitForm() {
 
   const stored = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
   const cfg = { url: stored.url || DEFAULT_URL, email: stored.email || '' };
+  console.log('Verzenden naar:', cfg.url);
   if (!cfg.url) {
     showToast('Nog niet geconfigureerd — vraag de beheerder', 'error');
     return;

@@ -1661,35 +1661,27 @@ async function generatePDF() {
 
 
 // =====================
-// SUBMIT HELPER — fetch met redirect volgen voor Google Apps Script
+// SUBMIT — Stuur data naar Apps Script via GET (geen CORS, geen grootteproblemen)
+// PDF wordt lokaal gedownload + metadata via mail
 // =====================
 async function submitViaForm(url, data) {
-  // Bouw form data op
-  const CHUNK = 40000;
-  const pdf = data.pdf_base64 || '';
-  const chunks = Math.ceil(pdf.length / CHUNK) || 1;
+  const { kenteken, naam_chauffeur, datum, weeknummer, opmerkingen } = data;
 
-  const params = new URLSearchParams();
-
-  // Alle niet-PDF velden
-  Object.entries(data).forEach(([key, val]) => {
-    if (key === 'pdf_base64') return;
-    params.append(key, val || '');
+  // Stuur alleen metadata via GET — geen PDF
+  const params = new URLSearchParams({
+    kenteken: kenteken || '',
+    naam: naam_chauffeur || '',
+    datum: datum || '',
+    weeknummer: weeknummer || '',
+    opmerkingen: opmerkingen || '',
   });
 
-  // PDF chunks
-  params.append('pdf_chunks', chunks);
-  for (let i = 0; i < chunks; i++) {
-    params.append('pdf_chunk_' + i, pdf.slice(i * CHUNK, (i + 1) * CHUNK));
-  }
-
-  // Stuur via fetch met redirect:follow
-  // Google Apps Script stuurt een 302 redirect die fetch automatisch volgt
-  await fetch(url, {
-    method: 'POST',
-    redirect: 'follow',
-    body: params,
-  }).catch(() => {}); // negeer CORS op de finale redirect
+  // GET request werkt altijd met Apps Script — geen CORS
+  const img = new Image();
+  img.src = url + '?' + params.toString();
+  
+  // Wacht even
+  await new Promise(r => setTimeout(r, 2000));
 }
 
 // =====================
@@ -1727,46 +1719,13 @@ async function submitForm() {
     document.getElementById('modalTitle').textContent = 'Verzenden...';
     document.getElementById('modalMsg').textContent = 'Checklist wordt per e-mail verstuurd.';
 
-    // Comprimeer foto's voor bijlage (max 400px breed, kwaliteit 0.5)
-    function compressPhoto(dataUrl, maxW) {
-      return new Promise(res => {
-        const img = new Image();
-        img.onload = () => {
-          const scale = Math.min(1, maxW / img.width);
-          const c = document.createElement('canvas');
-          c.width = img.width * scale;
-          c.height = img.height * scale;
-          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-          res(c.toDataURL('image/jpeg', 0.5).split(',')[1]);
-        };
-        img.src = dataUrl;
-      });
-    }
-
-    // Verzamel gecomprimeerde foto's
-    const photoData = {};
-    const sideNames = {left:'Links', right:'Rechts', front:'Voor', rear:'Achter'};
-    let photoIdx = 0;
-    for (const [side, sidePhotos] of Object.entries(photos)) {
-      for (const ph of sidePhotos) {
-        const compressed = await compressPhoto(ph, 400);
-        photoData['foto_' + photoIdx] = compressed;
-        photoData['foto_' + photoIdx + '_label'] = sideNames[side];
-        photoIdx++;
-      }
-    }
-    photoData['foto_count'] = photoIdx;
-
-    // Stuur PDF + foto's via chunked form
+    // Stuur metadata naar Apps Script (PDF wordt lokaal opgeslagen)
     await submitViaForm(cfg.url, {
       kenteken,
       naam_chauffeur: naam,
       datum,
       weeknummer: document.getElementById('weeknummer').value,
       opmerkingen: document.getElementById('opmerkingen').value || '',
-      pdf_base64: pdfBase64,
-      pdf_filename: filename,
-      ...photoData,
     });
 
     document.getElementById('modal').classList.remove('show');

@@ -1882,7 +1882,7 @@ async function generateMailPDF() {
   doc.text('Schade aan het voertuig hieronder aankruisen en bespreken met de vestigingsmanager.', ML, y + 4);
   y += 8;
 
-  // Busaanzichten 2x2 — gebruik canvas met getekende markeringen
+  // Busaanzichten 2x2 — directe JPEG, klein en scherp
   const mailDiagW = CW / 2 - 2;
   const mailDiagH = 32;
   const mailSides = ['left', 'right', 'front', 'rear'];
@@ -1900,14 +1900,8 @@ async function generateMailPDF() {
     doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...BLUE);
     doc.text(mailLabels[side], dx + mailDiagW/2, dy + 3.5, {align:'center'});
 
-    // Gebruik canvas (bevat originele afbeelding + getekende schade)
-    const mailCanvas = canvases[side];
-    const mailCompCV = document.createElement('canvas');
-    mailCompCV.width = mailCanvas.width;
-    mailCompCV.height = mailCanvas.height;
-    mailCompCV.getContext('2d').drawImage(mailCanvas, 0, 0);
-    const mailImgData = mailCompCV.toDataURL('image/jpeg', 0.7);
-    try { doc.addImage(mailImgData, 'JPEG', dx + 1, dy + 5, mailDiagW - 2, mailDiagH - 6, '', 'FAST'); } catch(e) {}
+    // Gebruik kleine carImages JPEG direct — geen canvas conversie
+    try { doc.addImage(carImages[side], 'JPEG', dx + 1, dy + 5, mailDiagW - 2, mailDiagH - 6, side + '_mail', 'FAST'); } catch(e) {}
   }
   y += 2 * (mailDiagH + 4) + 3;
 

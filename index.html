@@ -1153,9 +1153,8 @@ function sigDraw(e, canvas) {
 
 function clearSignature() {
   const canvas = document.getElementById('sigCanvas');
-  const dpr = window.devicePixelRatio || 1;
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   sigHasMark = false;
   document.getElementById('sigHint').classList.remove('hidden');
 }
@@ -1699,10 +1698,10 @@ async function submitViaForm(url, data) {
       + '&total=' + total
       + '&data=' + encodeURIComponent(chunk);
     try { await fetch(chunkUrl, { method: 'GET', mode: 'no-cors' }); } catch(e) {}
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 200));
   }
 
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise(r => setTimeout(r, 1500));
 
   document.getElementById('modalMsg').textContent = 'E-mail versturen...';
   const sendUrl = url
@@ -1892,8 +1891,8 @@ async function generateMailPDF() {
 
     // Combineer kleine JPEG + canvas tekening in één kleine canvas
     const mailMergeCV = document.createElement('canvas');
-    mailMergeCV.width = 500;
-    mailMergeCV.height = side === 'left' || side === 'right' ? 185 : 375;
+    mailMergeCV.width = 240;
+    mailMergeCV.height = side === 'left' || side === 'right' ? 89 : 180;
     const mailMergeCtx = mailMergeCV.getContext('2d');
 
     // Teken eerst de kleine JPEG achtergrond
@@ -1909,7 +1908,7 @@ async function generateMailPDF() {
       mailMergeCtx.drawImage(srcCanvas, 0, 0, mailMergeCV.width, mailMergeCV.height);
     }
 
-    const mailMergeData = mailMergeCV.toDataURL('image/jpeg', 0.8);
+    const mailMergeData = mailMergeCV.toDataURL('image/jpeg', 0.6);
     try { doc.addImage(mailMergeData, 'JPEG', dx + 1, dy + 5, mailDiagW - 2, mailDiagH - 6, side + '_mailm', 'FAST'); } catch(e) {}
   }
   y += 2 * (mailDiagH + 4) + 3;
@@ -1926,12 +1925,12 @@ async function generateMailPDF() {
     // Comprimeer handtekening — direct van canvas, heel klein
     const sigCanvas = document.getElementById('sigCanvas');
     const sigSmallCV = document.createElement('canvas');
-    sigSmallCV.width = 600; sigSmallCV.height = 180;
+    sigSmallCV.width = 300; sigSmallCV.height = 90;
     const sigSmallCtx = sigSmallCV.getContext('2d');
     sigSmallCtx.fillStyle = 'white';
-    sigSmallCtx.fillRect(0, 0, 600, 180);
-    sigSmallCtx.drawImage(sigCanvas, 0, 0, 600, 180);
-    const sigCompressed = sigSmallCV.toDataURL('image/jpeg', 0.85);
+    sigSmallCtx.fillRect(0, 0, 300, 90);
+    sigSmallCtx.drawImage(sigCanvas, 0, 0, 300, 90);
+    const sigCompressed = sigSmallCV.toDataURL('image/jpeg', 0.75);
     try { doc.addImage(sigCompressed, 'JPEG', ML + 2, y + 5, sigW - 4, sigH - 7, 'sig_mail', 'FAST'); } catch(e) {}
   }
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...BLACK);

@@ -1687,8 +1687,11 @@ async function submitViaForm(url, data) {
         total,
         data: chunk,
       });
+      // Gebruik encodeURIComponent om base64 correct te versturen
       const img = new Image();
-      img.src = url + '?' + params.toString();
+      img.src = url + '?action=chunk&sessionId=' + encodeURIComponent(sessionId)
+        + '&idx=' + i + '&total=' + total
+        + '&data=' + encodeURIComponent(chunk);
       // Wacht 300ms tussen chunks
       await new Promise(r => setTimeout(r, 300));
     }

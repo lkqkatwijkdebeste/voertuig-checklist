@@ -1016,7 +1016,8 @@ function initCanvases() {
   ['left','right','front','rear'].forEach(side => {
     const canvas = document.getElementById('canvas_' + side);
     const wrap = canvas.parentElement;
-    const W = wrap.offsetWidth || 180;
+    // Canvas grootte — klein houden voor kleinere PDF
+    const W = Math.min(wrap.offsetWidth || 180, 300);
     const H = Math.round(W * (side === 'left' || side === 'right' ? 0.6 : 0.7));
     canvas.width = W;
     canvas.height = H;
@@ -1537,9 +1538,14 @@ async function generatePDF() {
     doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...BLUE);
     doc.text(sideLabel[side], dx + diagW/2, dy + 3.5, {align:'center'});
 
-    // Car canvas image
-    const imgData = canvases[side].toDataURL('image/png');
-    try { doc.addImage(imgData, 'PNG', dx + 2, dy + 5, diagW - 4, diagH - 7); } catch(e){}
+    // Car canvas image — gecomprimeerd naar JPEG
+    const rawCanvas = canvases[side];
+    const compCV = document.createElement('canvas');
+    compCV.width = rawCanvas.width;
+    compCV.height = rawCanvas.height;
+    compCV.getContext('2d').drawImage(rawCanvas, 0, 0);
+    const imgData = compCV.toDataURL('image/jpeg', 0.6);
+    try { doc.addImage(imgData, 'JPEG', dx + 2, dy + 5, diagW - 4, diagH - 7, '', 'FAST'); } catch(e){}
   }
 
   y += 2 * (diagH + 6) + 2;
@@ -1556,9 +1562,23 @@ async function generatePDF() {
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GRAY);
   doc.text('Handtekening en naam chauffeur', ML + 2, y + 4);
   // Embed actual signature drawing
-  const sigData = getSignatureDataURL();
-  if (sigData) {
-    try { doc.addImage(sigData, 'PNG', ML + 2, y + 5, sigW - 4, sigH - 7); } catch(e) {}
+  const sigDataRaw = getSignatureDataURL();
+  if (sigDataRaw) {
+    // Comprimeer handtekening
+    const sigCompressed = await new Promise(res => {
+      const img = new Image();
+      img.onload = () => {
+        const cv = document.createElement('canvas');
+        cv.width = img.width; cv.height = img.height;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(img, 0, 0);
+        res(cv.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = sigDataRaw;
+    });
+    try { doc.addImage(sigCompressed, 'JPEG', ML + 2, y + 5, sigW - 4, sigH - 7, '', 'FAST'); } catch(e) {}
   }
   // Chauffeur name under signature
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...BLACK);

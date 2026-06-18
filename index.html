@@ -633,19 +633,41 @@
   <div class="bandenspanning-grid">
     <div class="band-cell">
       <label>Links voor (bar)</label>
-      <input type="number" id="band_lv" step="0.1" min="0" max="10" placeholder="0.0">
+      <input type="number" id="band_lv" step="0.1" min="0" max="10" placeholder="0.0" oninput="checkBandValue(this, 1.5, 'bar')">
     </div>
     <div class="band-cell">
       <label>Rechts voor (bar)</label>
-      <input type="number" id="band_rv" step="0.1" min="0" max="10" placeholder="0.0">
+      <input type="number" id="band_rv" step="0.1" min="0" max="10" placeholder="0.0" oninput="checkBandValue(this, 1.5, 'bar')">
     </div>
     <div class="band-cell">
       <label>Links achter (bar)</label>
-      <input type="number" id="band_la" step="0.1" min="0" max="10" placeholder="0.0">
+      <input type="number" id="band_la" step="0.1" min="0" max="10" placeholder="0.0" oninput="checkBandValue(this, 1.5, 'bar')">
     </div>
     <div class="band-cell">
       <label>Rechts achter (bar)</label>
-      <input type="number" id="band_ra" step="0.1" min="0" max="10" placeholder="0.0">
+      <input type="number" id="band_ra" step="0.1" min="0" max="10" placeholder="0.0" oninput="checkBandValue(this, 1.5, 'bar')">
+    </div>
+  </div>
+  <!-- Profieldiepte invoervelden -->
+  <div style="padding:8px 14px 4px;border-top:1px solid var(--border)">
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">Profieldiepte (mm) — minimaal 1.6mm</div>
+  </div>
+  <div class="bandenspanning-grid">
+    <div class="band-cell">
+      <label>Links voor (mm)</label>
+      <input type="number" id="profiel_lv" step="0.1" min="0" max="20" placeholder="0.0" oninput="checkBandValue(this, 1.6, 'mm')">
+    </div>
+    <div class="band-cell">
+      <label>Rechts voor (mm)</label>
+      <input type="number" id="profiel_rv" step="0.1" min="0" max="20" placeholder="0.0" oninput="checkBandValue(this, 1.6, 'mm')">
+    </div>
+    <div class="band-cell">
+      <label>Links achter (mm)</label>
+      <input type="number" id="profiel_la" step="0.1" min="0" max="20" placeholder="0.0" oninput="checkBandValue(this, 1.6, 'mm')">
+    </div>
+    <div class="band-cell">
+      <label>Rechts achter (mm)</label>
+      <input type="number" id="profiel_ra" step="0.1" min="0" max="20" placeholder="0.0" oninput="checkBandValue(this, 1.6, 'mm')">
     </div>
   </div>
   <div class="check-row" data-key="profieldiepte">
@@ -1165,6 +1187,22 @@ function getSignatureDataURL() {
 
 
 
+function checkBandValue(input, minVal, unit) {
+  const val = parseFloat(input.value);
+  if (input.value === '') {
+    input.style.color = '';
+    input.style.fontWeight = '';
+    return;
+  }
+  if (!isNaN(val) && val < minVal) {
+    input.style.color = '#c62828';
+    input.style.fontWeight = '700';
+  } else {
+    input.style.color = '#2e7d32';
+    input.style.fontWeight = '700';
+  }
+}
+
 function setColor(c, el) {
   drawColor = c;
   document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
@@ -1263,7 +1301,7 @@ function validate() {
     document.getElementById('sigRequiredMsg').classList.add('show');
     ok = false;
   }
-  const bandFields = ['band_lv','band_rv','band_la','band_ra'];
+  const bandFields = ['band_lv','band_rv','band_la','band_ra','profiel_lv','profiel_rv','profiel_la','profiel_ra'];
   bandFields.forEach(id => {
     const el = document.getElementById(id);
     if (!el.value.trim()) { el.classList.add('invalid-field'); ok = false; }
@@ -1785,10 +1823,10 @@ async function generateMailPDF() {
     { label: 'Auto gewassen', key: 'auto_gewassen' },
     { label: 'Interieur gereinigd', key: 'interieur_gereinigd' },
     { label: 'Bandenspanning', key: 'bandenspanning' },
-    { label: '  LV ' + document.getElementById('band_lv').value + ' bar', key: null },
-    { label: '  RV ' + document.getElementById('band_rv').value + ' bar', key: null },
-    { label: '  LA ' + document.getElementById('band_la').value + ' bar', key: null },
-    { label: '  RA ' + document.getElementById('band_ra').value + ' bar', key: null },
+    { label: '  LV ' + document.getElementById('band_lv').value + ' bar  /  ' + document.getElementById('profiel_lv').value + ' mm', key: null },
+    { label: '  RV ' + document.getElementById('band_rv').value + ' bar  /  ' + document.getElementById('profiel_rv').value + ' mm', key: null },
+    { label: '  LA ' + document.getElementById('band_la').value + ' bar  /  ' + document.getElementById('profiel_la').value + ' mm', key: null },
+    { label: '  RA ' + document.getElementById('band_ra').value + ' bar  /  ' + document.getElementById('profiel_ra').value + ' mm', key: null },
     { label: 'Profieldiepte', key: 'profieldiepte' },
     { label: 'Reserveband', key: 'reserveband' },
     { label: 'Wieldoppen compleet', key: 'wieldoppen_compleet' },

@@ -1902,8 +1902,8 @@ async function generateMailPDF() {
 
     // Combineer kleine JPEG + canvas tekening in één kleine canvas
     const mailMergeCV = document.createElement('canvas');
-    mailMergeCV.width = 250;
-    mailMergeCV.height = side === 'left' || side === 'right' ? 93 : 188;
+    mailMergeCV.width = 180;
+    mailMergeCV.height = side === 'left' || side === 'right' ? 67 : 135;
     const mailMergeCtx = mailMergeCV.getContext('2d');
 
     // Teken eerst de kleine JPEG achtergrond
@@ -1919,7 +1919,7 @@ async function generateMailPDF() {
       mailMergeCtx.drawImage(srcCanvas, 0, 0, mailMergeCV.width, mailMergeCV.height);
     }
 
-    const mailMergeData = mailMergeCV.toDataURL('image/jpeg', 0.35);
+    const mailMergeData = mailMergeCV.toDataURL('image/jpeg', 0.3);
     try { doc.addImage(mailMergeData, 'JPEG', dx + 1, dy + 5, mailDiagW - 2, mailDiagH - 6, side + '_mailm', 'FAST'); } catch(e) {}
   }
   y += 2 * (mailDiagH + 4) + 3;
@@ -1933,20 +1933,15 @@ async function generateMailPDF() {
   doc.text('Handtekening en naam chauffeur', ML + 2, y + 4);
   const sigDataRaw = getSignatureDataURL();
   if (sigDataRaw) {
-    // Comprimeer handtekening naar kleine JPEG
-    const sigCompressed = await new Promise(res => {
-      const img = new Image();
-      img.onload = () => {
-        const cv = document.createElement('canvas');
-        cv.width = 200; cv.height = 60;
-        const ctx = cv.getContext('2d');
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, 200, 60);
-        ctx.drawImage(img, 0, 0, 200, 60);
-        res(cv.toDataURL('image/jpeg', 0.5));
-      };
-      img.src = sigDataRaw;
-    });
+    // Comprimeer handtekening — direct van canvas, heel klein
+    const sigCanvas = document.getElementById('sigCanvas');
+    const sigSmallCV = document.createElement('canvas');
+    sigSmallCV.width = 120; sigSmallCV.height = 36;
+    const sigSmallCtx = sigSmallCV.getContext('2d');
+    sigSmallCtx.fillStyle = 'white';
+    sigSmallCtx.fillRect(0, 0, 120, 36);
+    sigSmallCtx.drawImage(sigCanvas, 0, 0, 120, 36);
+    const sigCompressed = sigSmallCV.toDataURL('image/jpeg', 0.4);
     try { doc.addImage(sigCompressed, 'JPEG', ML + 2, y + 5, sigW - 4, sigH - 7, 'sig_mail', 'FAST'); } catch(e) {}
   }
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...BLACK);

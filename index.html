@@ -978,21 +978,23 @@ const carImagesHQ = {
 // =====================
 // CONFIG
 // =====================
+// Vaste Apps Script URL — hoeft niet per apparaat ingesteld te worden
+const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbwyYRS09cAB0wzTGi0JpaMrb-CkkrrbZA9Q4yvGbm2Kp2yPN0BPsE0qBAQF9ssojARg/exec';
+
 function loadConfig() {
-  const cfg = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
+  const stored = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
+  // Gebruik opgeslagen URL of de vaste standaard URL
+  const cfg = { url: stored.url || DEFAULT_URL, email: stored.email || '' };
+  
   const params = new URLSearchParams(window.location.search);
   const isAdmin = params.get('admin') === 'lkq2025';
   const section = document.getElementById('configSection');
   if (isAdmin) {
     section.style.display = 'block';
     const status = document.getElementById('cfg_status');
-    if (cfg.url) {
-      status.textContent = 'Ingesteld: ' + cfg.url;
-      document.getElementById('cfg_url').value = cfg.url;
-      document.getElementById('cfg_email').value = cfg.email || '';
-    } else {
-      status.textContent = 'Nog niet geconfigureerd — vul de Netlify URL in.';
-    }
+    status.textContent = 'Actieve URL: ' + cfg.url;
+    document.getElementById('cfg_url').value = cfg.url;
+    document.getElementById('cfg_email').value = cfg.email || '';
   } else {
     section.style.display = 'none';
   }

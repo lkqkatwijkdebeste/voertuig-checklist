@@ -1094,12 +1094,12 @@ let sigLastX = 0, sigLastY = 0;
 
 function initSignaturePad() {
   const canvas = document.getElementById('sigCanvas');
-  const dpr = window.devicePixelRatio || 1;
+  // Zet canvas resolutie gelijk aan display grootte — geen DPR scaling
+  // zodat coördinaten altijd kloppen
   const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  canvas.width = rect.width;
+  canvas.height = rect.height;
   const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
   ctx.strokeStyle = '#1a2332';
   ctx.lineWidth = 2.2;
   ctx.lineCap = 'round';
@@ -1118,7 +1118,12 @@ function initSignaturePad() {
 
 function getSigPos(e, canvas) {
   const r = canvas.getBoundingClientRect();
-  return { x: e.clientX - r.left, y: e.clientY - r.top };
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  return {
+    x: (e.clientX - r.left) * scaleX,
+    y: (e.clientY - r.top) * scaleY
+  };
 }
 
 function sigStart(e, canvas) {

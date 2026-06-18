@@ -1661,26 +1661,55 @@ async function generatePDF() {
 
 
 // =====================
-// SUBMIT — Stuur data naar Apps Script via GET (geen CORS, geen grootteproblemen)
-// PDF wordt lokaal gedownload + metadata via mail
+// SUBMIT — Stuur PDF in chunks via GET, dan mail
 // =====================
 async function submitViaForm(url, data) {
-  const { kenteken, naam_chauffeur, datum, weeknummer, opmerkingen } = data;
+  const { kenteken, naam_chauffeur, datum, weeknummer, opmerkingen, pdf_base64 } = data;
 
-  // Stuur alleen metadata via GET — geen PDF
-  const params = new URLSearchParams({
+  // Unieke sessie ID
+  const sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2,5);
+
+  // Stuur PDF in chunks van 8000 tekens via GET
+  const CHUNK = 8000;
+  const pdf = pdf_base64 || '';
+  const total = Math.ceil(pdf.length / CHUNK) || 0;
+
+  document.getElementById('modalTitle').textContent = 'PDF versturen...';
+
+  if (total > 0) {
+    for (let i = 0; i < total; i++) {
+      document.getElementById('modalMsg').textContent = 'Chunk ' + (i+1) + ' van ' + total + '...';
+      const chunk = pdf.slice(i * CHUNK, (i+1) * CHUNK);
+      const params = new URLSearchParams({
+        action: 'chunk',
+        sessionId,
+        idx: i,
+        total,
+        data: chunk,
+      });
+      const img = new Image();
+      img.src = url + '?' + params.toString();
+      // Wacht 300ms tussen chunks
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  // Wacht even voor cache
+  await new Promise(r => setTimeout(r, 500));
+
+  // Stuur verzendopdracht met metadata
+  document.getElementById('modalMsg').textContent = 'E-mail versturen...';
+  const sendParams = new URLSearchParams({
+    action: 'send',
+    sessionId,
     kenteken: kenteken || '',
     naam: naam_chauffeur || '',
     datum: datum || '',
     weeknummer: weeknummer || '',
     opmerkingen: opmerkingen || '',
   });
-
-  // GET request werkt altijd met Apps Script — geen CORS
-  const img = new Image();
-  img.src = url + '?' + params.toString();
-  
-  // Wacht even
+  const sendImg = new Image();
+  sendImg.src = url + '?' + sendParams.toString();
   await new Promise(r => setTimeout(r, 2000));
 }
 
@@ -1719,13 +1748,14 @@ async function submitForm() {
     document.getElementById('modalTitle').textContent = 'Verzenden...';
     document.getElementById('modalMsg').textContent = 'Checklist wordt per e-mail verstuurd.';
 
-    // Stuur metadata naar Apps Script (PDF wordt lokaal opgeslagen)
+    // Stuur PDF + metadata naar Apps Script
     await submitViaForm(cfg.url, {
       kenteken,
       naam_chauffeur: naam,
       datum,
       weeknummer: document.getElementById('weeknummer').value,
       opmerkingen: document.getElementById('opmerkingen').value || '',
+      pdf_base64: pdfBase64,
     });
 
     document.getElementById('modal').classList.remove('show');

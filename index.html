@@ -1623,6 +1623,55 @@ async function generatePDF() {
   return doc;
 }
 
+
+// =====================
+// FORM SUBMIT HELPER — werkt met Google Apps Script zonder CORS
+// =====================
+function submitViaForm(url, data) {
+  return new Promise((resolve) => {
+    // Maak verborgen iframe
+    const iframe = document.createElement('iframe');
+    iframe.name = 'hidden_submit_' + Date.now();
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    // Maak verborgen form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    form.target = iframe.name;
+    form.style.display = 'none';
+
+    // Voeg alle velden toe
+    Object.entries(data).forEach(([key, val]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = val || '';
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+
+    // Wacht op iframe load = versturen klaar
+    iframe.onload = () => {
+      setTimeout(() => {
+        document.body.removeChild(form);
+        document.body.removeChild(iframe);
+        resolve();
+      }, 500);
+    };
+
+    // Timeout fallback na 10 seconden
+    setTimeout(() => {
+      try { document.body.removeChild(form); document.body.removeChild(iframe); } catch(e) {}
+      resolve();
+    }, 10000);
+
+    form.submit();
+  });
+}
+
 // =====================
 // SUBMIT
 // =====================
@@ -1658,24 +1707,17 @@ async function submitForm() {
     document.getElementById('modalTitle').textContent = 'Verzenden...';
     document.getElementById('modalMsg').textContent = 'Checklist wordt per e-mail verstuurd.';
 
-    // Google Apps Script vereist no-cors mode voor cross-origin requests
-    // We sturen als URL-encoded form data om preflight te vermijden
-    const formData = new URLSearchParams();
-    formData.append('kenteken', kenteken);
-    formData.append('naam_chauffeur', naam);
-    formData.append('datum', datum);
-    formData.append('weeknummer', document.getElementById('weeknummer').value);
-    formData.append('opmerkingen', document.getElementById('opmerkingen').value || '');
-    formData.append('pdf_base64', pdfBase64);
-    formData.append('pdf_filename', filename);
-
-    await fetch(cfg.url, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: formData,
+    // Stuur data via verborgen form — werkt altijd met Google Apps Script
+    await submitViaForm(cfg.url, {
+      kenteken,
+      naam_chauffeur: naam,
+      datum,
+      weeknummer: document.getElementById('weeknummer').value,
+      opmerkingen: document.getElementById('opmerkingen').value || '',
+      pdf_base64: pdfBase64,
+      pdf_filename: filename,
     });
 
-    // no-cors geeft altijd opaque response — we gaan ervan uit dat het gelukt is
     document.getElementById('modal').classList.remove('show');
     showToast('✓ Checklist succesvol verzonden!', 'success');
     doc.save(filename);

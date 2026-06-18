@@ -1024,9 +1024,9 @@ function initCanvases() {
   ['left','right','front','rear'].forEach(side => {
     const canvas = document.getElementById('canvas_' + side);
     const wrap = canvas.parentElement;
-    // Canvas grootte — klein houden voor kleinere PDF
-    const W = Math.min(wrap.offsetWidth || 180, 300);
-    const H = Math.round(W * (side === 'left' || side === 'right' ? 0.6 : 0.7));
+    // Canvas grootte — beperkt voor kleinere PDF maar groot genoeg om op te tekenen
+    const W = Math.min(wrap.offsetWidth || 180, 400);
+    const H = Math.round(W * (side === 'left' || side === 'right' ? 0.37 : 0.75));
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -1876,6 +1876,40 @@ async function generateMailPDF() {
     doc.text(doc.splitTextToSize(opm, CW - 4).slice(0,2), ML + 2, y + 9);
   }
   y += opmH + 3;
+
+  // Schade instructie
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...BLACK);
+  doc.text('Schade aan het voertuig hieronder aankruisen en bespreken met de vestigingsmanager.', ML, y + 4);
+  y += 8;
+
+  // Busaanzichten 2x2 — gebruik canvas met getekende markeringen
+  const mailDiagW = CW / 2 - 2;
+  const mailDiagH = 32;
+  const mailSides = ['left', 'right', 'front', 'rear'];
+  const mailLabels = { left:'Linkerzijde', right:'Rechterzijde', front:'Voorzijde', rear:'Achterzijde' };
+
+  for (let i = 0; i < 4; i++) {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const dx = ML + col * (mailDiagW + 4);
+    const dy = y + row * (mailDiagH + 4);
+    const side = mailSides[i];
+
+    doc.setFillColor(252,252,255); doc.setDrawColor(...LGRAY); doc.setLineWidth(0.25);
+    doc.rect(dx, dy, mailDiagW, mailDiagH, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...BLUE);
+    doc.text(mailLabels[side], dx + mailDiagW/2, dy + 3.5, {align:'center'});
+
+    // Gebruik canvas (bevat originele afbeelding + getekende schade)
+    const mailCanvas = canvases[side];
+    const mailCompCV = document.createElement('canvas');
+    mailCompCV.width = mailCanvas.width;
+    mailCompCV.height = mailCanvas.height;
+    mailCompCV.getContext('2d').drawImage(mailCanvas, 0, 0);
+    const mailImgData = mailCompCV.toDataURL('image/jpeg', 0.7);
+    try { doc.addImage(mailImgData, 'JPEG', dx + 1, dy + 5, mailDiagW - 2, mailDiagH - 6, '', 'FAST'); } catch(e) {}
+  }
+  y += 2 * (mailDiagH + 4) + 3;
 
   // Handtekening
   const sigW = CW / 2 - 2;

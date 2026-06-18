@@ -1979,7 +1979,8 @@ async function submitForm() {
     return;
   }
 
-  const cfg = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
+  const stored = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
+  const cfg = { url: stored.url || DEFAULT_URL, email: stored.email || '' };
   if (!cfg.url) {
     showToast('Nog niet geconfigureerd — vraag de beheerder', 'error');
     return;

@@ -979,12 +979,12 @@ const carImagesHQ = {
 // CONFIG
 // =====================
 // Vaste Apps Script URL — hoeft niet per apparaat ingesteld te worden
-const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbwyYRS09cAB0wzTGi0JpaMrb-CkkrrbZA9Q4yvGbm2Kp2yPN0BPsE0qBAQF9ssojARg/exec';
+const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbzBhAh1W2D57lZKnPbF4IKkUbefFdrzdgEQ88O42Iq3Hx1zN1b8LDTh1rRcv647ADem/exec';
 
 function loadConfig() {
   const stored = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
   // Gebruik opgeslagen URL of de vaste standaard URL
-  const cfg = { url: stored.url || DEFAULT_URL, email: stored.email || '' };
+  const cfg = { url: DEFAULT_URL, email: stored.email || '' };
   
   const params = new URLSearchParams(window.location.search);
   const isAdmin = params.get('admin') === 'lkq2025';
@@ -1699,10 +1699,10 @@ async function submitViaForm(url, data) {
       + '&total=' + total
       + '&data=' + encodeURIComponent(chunk);
     try { await fetch(chunkUrl, { method: 'GET', mode: 'no-cors' }); } catch(e) {}
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 300));
   }
 
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 2000));
 
   document.getElementById('modalMsg').textContent = 'E-mail versturen...';
   const sendUrl = url
@@ -1714,7 +1714,7 @@ async function submitViaForm(url, data) {
     + '&weeknummer=' + encodeURIComponent(weeknummer || '')
     + '&opmerkingen=' + encodeURIComponent(opmerkingen || '');
   try { await fetch(sendUrl, { method: 'GET', mode: 'no-cors' }); } catch(e) {}
-  await new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 2000));
 }
 
 // =====================
@@ -1963,7 +1963,8 @@ async function submitForm() {
   }
 
   const stored = JSON.parse(localStorage.getItem('lkq_cfg') || '{}');
-  const cfg = { url: stored.url || DEFAULT_URL, email: stored.email || '' };
+  // Gebruik altijd DEFAULT_URL — localStorage alleen voor admin overschrijving
+  const cfg = { url: DEFAULT_URL, email: stored.email || '' };
   console.log('Verzenden naar:', cfg.url);
   if (!cfg.url) {
     showToast('Nog niet geconfigureerd — vraag de beheerder', 'error');

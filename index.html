@@ -1661,69 +1661,35 @@ async function generatePDF() {
 
 
 // =====================
-// FORM SUBMIT HELPER — werkt met Google Apps Script zonder CORS
-// Stuurt PDF in chunks van 50000 tekens
+// SUBMIT HELPER — fetch met redirect volgen voor Google Apps Script
 // =====================
-function submitViaForm(url, data) {
-  return new Promise((resolve) => {
-    const iframe = document.createElement('iframe');
-    iframe.name = 'hidden_submit_' + Date.now();
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
+async function submitViaForm(url, data) {
+  // Bouw form data op
+  const CHUNK = 40000;
+  const pdf = data.pdf_base64 || '';
+  const chunks = Math.ceil(pdf.length / CHUNK) || 1;
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = url;
-    form.target = iframe.name;
-    form.style.display = 'none';
+  const params = new URLSearchParams();
 
-    // Split PDF base64 in chunks
-    const CHUNK = 50000;
-    const pdf = data.pdf_base64 || '';
-    const chunks = Math.ceil(pdf.length / CHUNK) || 1;
-
-    // Voeg alle niet-PDF velden toe
-    Object.entries(data).forEach(([key, val]) => {
-      if (key === 'pdf_base64') return;
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = key;
-      input.value = val || '';
-      form.appendChild(input);
-    });
-
-    // Voeg chunk count toe
-    const chunkCount = document.createElement('input');
-    chunkCount.type = 'hidden';
-    chunkCount.name = 'pdf_chunks';
-    chunkCount.value = chunks;
-    form.appendChild(chunkCount);
-
-    // Voeg PDF chunks toe
-    for (let i = 0; i < chunks; i++) {
-      const chunk = document.createElement('input');
-      chunk.type = 'hidden';
-      chunk.name = 'pdf_chunk_' + i;
-      chunk.value = pdf.slice(i * CHUNK, (i + 1) * CHUNK);
-      form.appendChild(chunk);
-    }
-
-    document.body.appendChild(form);
-
-    iframe.onload = () => {
-      setTimeout(() => {
-        try { document.body.removeChild(form); document.body.removeChild(iframe); } catch(e) {}
-        resolve();
-      }, 500);
-    };
-
-    setTimeout(() => {
-      try { document.body.removeChild(form); document.body.removeChild(iframe); } catch(e) {}
-      resolve();
-    }, 15000);
-
-    form.submit();
+  // Alle niet-PDF velden
+  Object.entries(data).forEach(([key, val]) => {
+    if (key === 'pdf_base64') return;
+    params.append(key, val || '');
   });
+
+  // PDF chunks
+  params.append('pdf_chunks', chunks);
+  for (let i = 0; i < chunks; i++) {
+    params.append('pdf_chunk_' + i, pdf.slice(i * CHUNK, (i + 1) * CHUNK));
+  }
+
+  // Stuur via fetch met redirect:follow
+  // Google Apps Script stuurt een 302 redirect die fetch automatisch volgt
+  await fetch(url, {
+    method: 'POST',
+    redirect: 'follow',
+    body: params,
+  }).catch(() => {}); // negeer CORS op de finale redirect
 }
 
 // =====================

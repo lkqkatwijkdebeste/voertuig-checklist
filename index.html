@@ -1748,10 +1748,10 @@ async function submitViaForm(url, data) {
       + '&total=' + total
       + '&data=' + encodeURIComponent(chunk);
     try { await fetch(chunkUrl, { method: 'GET', mode: 'no-cors' }); } catch(e) {}
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 100));
   }
 
-  await new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 1000));
 
   document.getElementById('modalMsg').textContent = 'E-mail versturen...';
   const sendUrl = url

@@ -1720,7 +1720,7 @@ async function submitViaForm(url, data) {
   const { kenteken, naam_chauffeur, datum, weeknummer, opmerkingen, pdf_base64 } = data;
 
   const sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2,5);
-  const CHUNK = 6000;
+  const CHUNK = 4000;
   const pdf = pdf_base64 || '';
   const total = Math.ceil(pdf.length / CHUNK) || 0;
 
@@ -1823,10 +1823,10 @@ async function generateMailPDF() {
     { label: 'Auto gewassen', key: 'auto_gewassen' },
     { label: 'Interieur gereinigd', key: 'interieur_gereinigd' },
     { label: 'Bandenspanning', key: 'bandenspanning' },
-    { label: '  LV ' + document.getElementById('band_lv').value + ' bar  /  ' + document.getElementById('profiel_lv').value + ' mm', key: null },
-    { label: '  RV ' + document.getElementById('band_rv').value + ' bar  /  ' + document.getElementById('profiel_rv').value + ' mm', key: null },
-    { label: '  LA ' + document.getElementById('band_la').value + ' bar  /  ' + document.getElementById('profiel_la').value + ' mm', key: null },
-    { label: '  RA ' + document.getElementById('band_ra').value + ' bar  /  ' + document.getElementById('profiel_ra').value + ' mm', key: null },
+    { label: '  LV ' + document.getElementById('band_lv').value + ' bar  /  ' + document.getElementById('profiel_lv').value + ' mm', key: null, bandVal: parseFloat(document.getElementById('band_lv').value), profielVal: parseFloat(document.getElementById('profiel_lv').value) },
+    { label: '  RV ' + document.getElementById('band_rv').value + ' bar  /  ' + document.getElementById('profiel_rv').value + ' mm', key: null, bandVal: parseFloat(document.getElementById('band_rv').value), profielVal: parseFloat(document.getElementById('profiel_rv').value) },
+    { label: '  LA ' + document.getElementById('band_la').value + ' bar  /  ' + document.getElementById('profiel_la').value + ' mm', key: null, bandVal: parseFloat(document.getElementById('band_la').value), profielVal: parseFloat(document.getElementById('profiel_la').value) },
+    { label: '  RA ' + document.getElementById('band_ra').value + ' bar  /  ' + document.getElementById('profiel_ra').value + ' mm', key: null, bandVal: parseFloat(document.getElementById('band_ra').value), profielVal: parseFloat(document.getElementById('profiel_ra').value) },
     { label: 'Profieldiepte', key: 'profieldiepte' },
     { label: 'Reserveband', key: 'reserveband' },
     { label: 'Wieldoppen compleet', key: 'wieldoppen_compleet' },
@@ -1879,8 +1879,26 @@ async function generateMailPDF() {
         doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(...GRAY);
         doc.text(r.label, cx + 2, ry + ROWH/2 + 2);
       } else if (!r.key) {
-        doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...GRAY);
-        doc.text(r.label, cx + 4, ry + ROWH/2 + 2);
+        // Kleurcodering voor bandenspanning en profieldiepte
+        if (r.bandVal !== undefined) {
+          const bandOk = !isNaN(r.bandVal) && r.bandVal >= 1.5;
+          const profielOk = !isNaN(r.profielVal) && r.profielVal >= 1.6;
+          // Splits label in stukken
+          const parts = r.label.trim().split('  /  ');
+          const prefix = parts[0]; // bijv "LV 1.4 bar"
+          const suffix = parts[1] || ''; // bijv "2.0 mm"
+          doc.setFont('helvetica','normal'); doc.setFontSize(7);
+          doc.setTextColor(...(bandOk ? GREEN : RED));
+          doc.text(prefix, cx + 4, ry + ROWH/2 + 2);
+          if (suffix) {
+            const pw = doc.getTextWidth(prefix) + 3;
+            doc.setTextColor(...(profielOk ? GREEN : RED));
+            doc.text('/ ' + suffix, cx + 4 + pw, ry + ROWH/2 + 2);
+          }
+        } else {
+          doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...GRAY);
+          doc.text(r.label, cx + 4, ry + ROWH/2 + 2);
+        }
       } else {
         doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...BLACK);
         doc.text(r.label, cx + 2, ry + ROWH/2 + 2);

@@ -2050,13 +2050,13 @@ async function generateMailPDF() {
       const compressed = await new Promise(res => {
         const img = new Image();
         img.onload = () => {
-          const maxW = 500;
+          const maxW = 300;
           const scale = Math.min(1, maxW / img.width);
           const cv = document.createElement('canvas');
           cv.width = Math.round(img.width * scale);
           cv.height = Math.round(img.height * scale);
           cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-          res(cv.toDataURL('image/jpeg', 0.6));
+          res(cv.toDataURL('image/jpeg', 0.4));
         };
         img.onerror = () => res(ph.src);
         img.src = ph.src;
